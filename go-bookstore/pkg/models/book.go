@@ -1,4 +1,4 @@
-package Model
+package models
 
 import (
 	"github.com/MuratCandasBozyigit/reimagined-broccoli/go-bookstore/pkg/config"
@@ -9,7 +9,7 @@ var db *gorm.DB
 
 type Book struct {
 	gorm.Model
-	Name      string `gorm:""json:"name"`
+	Name      string `json:"name"` // gorm:"" şeklindeki hatalı tırnak temizlendi
 	Author    string `json:"author"`
 	Publisher string `json:"publisher"`
 }
@@ -18,7 +18,7 @@ func init() {
 	config.Connect()
 	db = config.GetDB()
 	db.AutoMigrate(&Book{})
-	config.GetDB().Close()
+	// CRITICAL FIX: config.GetDB().Close() satırı silindi! Burası kapanırsa API'ler çalışmaz.
 }
 
 func (b *Book) CreateBook() *Book {
@@ -41,6 +41,11 @@ func GetBookById(Id int64) (*Book, *gorm.DB) {
 
 func DeleteBook(ID int64) Book {
 	var book Book
-	db.Where("ID=?", ID).Delete(book)
+	db.Where("ID=?", ID).Delete(&book) // Pointer (&) eklendi
 	return book
 }
+
+// func GetId(Id int64)  {
+// 	db := db.Where("ID=?", Id).Find(&id)
+// 	return  &id,db
+// }

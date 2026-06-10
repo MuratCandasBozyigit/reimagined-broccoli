@@ -6,28 +6,35 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/MuratCandasBozyigit/reimagined-broccoli/go-bookstore/pkg/Model"
+	"github.com/MuratCandasBozyigit/reimagined-broccoli/go-bookstore/pkg/models"
 	"github.com/MuratCandasBozyigit/reimagined-broccoli/go-bookstore/pkg/utils"
 	"github.com/gorilla/mux"
 )
 
-var newBook Model.Book
+var newBooks models.Book // küçük harfe çekildi
+var delBook models.Book
 
 func CreateBook(w http.ResponseWriter, r *http.Request) {
-	bookObj := &Model.Book{} // İsim çakışması olmasın diye bookObj yaptık
+	bookObj := &models.Book{} // küçük harfe çekildi
 	utils.ParseBody(r, bookObj)
-	b := bookObj.Create()
-	res, err := json.Marshal(b) // err tanımlandı
+
+	// FIX: Model dosyasındaki fonksiyonun adı CreateBook() olduğu için burası düzeltildi!
+	b := bookObj.CreateBook()
+
+	res, err := json.Marshal(b)
 	if err != nil {
 		fmt.Println("error while creating")
 	}
+
+	w.WriteHeader(http.StatusOK)
 	w.Write(res)
+
 }
 
 func GetBooks(w http.ResponseWriter, r *http.Request) {
-	newBooks := Model.GetAllBooks()                    // () eklendi, fonksiyon tetiklendi
-	res, _ := json.Marshal(newBooks)                   // newBook değil, yukarıdaki newBooks verildi
-	w.Header().Set("Content-Type", "application/json") // Yazım hatası düzeltildi
+	newBooks := models.GetAllBooks() // küçük harfe çekildi
+	res, _ := json.Marshal(newBooks)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
 }
@@ -39,18 +46,51 @@ func GetBooksById(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		fmt.Println("error while parsing")
 	}
-	bookDetails, _ := Model.GetBookById(ID)
-	res, _ := json.Marshal(bookDetails)                // Tırnaklar kaldırıldı, değişkenin kendisi verildi
-	w.Header().Set("Content-Type", "application/json") // Yazım hatası düzeltildi
+	bookDetails, _ := models.GetBookById(ID) // küçük harfe çekildi
+	res, _ := json.Marshal(bookDetails)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
 }
 
-// main.go'da hata vermemesi için parametreleri eklendi
 func UpdateBook(w http.ResponseWriter, r *http.Request) {
+	var updateBook = &models.Book{}
+	utils.ParseBody(r, updateBook)
+	vars := mux.Vars(r)
+	bookId := vars["bookId"]
+	ID, err := strconv.ParseInt(bookId, 0, 0)
+	if err != nil {
+		fmt.Println("error while parsing")
+	}
+	bookDetails, db := models.GetBookById(ID)
+	if updateBook.Name != "" {
+		bookDetails.Name = updateBook.Name
+	}
+	if updateBook.Author != "" {
+		bookDetails.Author = updateBook.Author
+	}
+	if updateBook.Publisher != "" {
+		bookDetails.Author = updateBook.Author
+	}
+	db.Save(&bookDetails)
+	res, _ := json.Marshal(bookDetails)
+	w.Header().Set("Content-Type", "pkglication")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 
+	return db
 }
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
-
+	vars := mux.Vars(r)
+	bookId := vars["bookId"]
+	ID, err := strconv.ParseInt(bookId, 0, 0)
+	if err != nil {
+		fmt.Println("error while parsing")
+	}
+	book := models.DeleteBook(ID)
+	res, _ := json.Marshal(book)
+	w.Header().Set("Content-Type", "pkglication/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(res)
 }
