@@ -12,7 +12,6 @@ import (
 )
 
 var newBooks models.Book // küçük harfe çekildi
-var delBook models.Book
 
 func CreateBook(w http.ResponseWriter, r *http.Request) {
 	bookObj := &models.Book{} // küçük harfe çekildi
@@ -78,7 +77,6 @@ func UpdateBook(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(res)
 
-	return db
 }
 
 func DeleteBook(w http.ResponseWriter, r *http.Request) {
