@@ -73,7 +73,10 @@ func base64Api(w http.ResponseWriter, r *http.Request) {
 	} else if action == "decode" {
 		decodedStr, err := base64.StdEncoding.DecodeString(queryStr)
 		if err != nil {
-			fmt.Println("naber")
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest) // 400 Hata Kodu
+			fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
+			return
 		}
 		temizMetin := string(decodedStr)
 
