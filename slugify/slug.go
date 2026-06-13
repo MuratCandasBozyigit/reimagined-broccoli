@@ -1,17 +1,12 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
-	"os"
+	"net/http"
 	"strings"
 )
 
-func main() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Println("Paste the link below")
-	fmt.Println("*********************")
-	input, _ := reader.ReadString('\n')
+func replacer(input string) {
 	input = strings.TrimSpace(input)
 	inputTL := strings.ToLower(input)
 	dash := strings.ReplaceAll(inputTL, " ", "-")
@@ -25,4 +20,24 @@ func main() {
 	)
 	done := replacer.Replace(dash)
 	fmt.Println(done)
+}
+
+func slugApi(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+	gelenMetin := queryParams.Get("input")
+
+	if gelenMetin == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest) // 400 Hata Kodu
+		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Naber %s kanka!", gelenMetin)
+}
+
+func main() {
+	http.HandleFunc("/api/v1/slugify", slugApi)
+	http.ListenAndServe(":9010", nil)
 }
