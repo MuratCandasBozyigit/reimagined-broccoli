@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -60,9 +61,36 @@ func analyze(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func base64Api(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+	queryStr := queryParams.Get("input")
+	action := queryParams.Get("action")
+	if action == "encode" {
+		encodedStr := base64.StdEncoding.EncodeToString([]byte(queryStr))
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"result": "%s"}`, encodedStr)
+	} else if action == "decode" {
+		decodedStr, err := base64.StdEncoding.DecodeString(queryStr)
+		if err != nil {
+			fmt.Println("naber")
+		}
+		temizMetin := string(decodedStr)
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, `{"result": "%s"}`, temizMetin)
+	} else {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest) // 400 Hata Kodu
+		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
+		return
+	}
+}
+
 func main() {
 	http.HandleFunc("/api/v1/slugify", slugApi)
 	http.HandleFunc("/api/v1/analyze", analyze)
-
+	http.HandleFunc("/api/v1/base64", base64Api)
 	http.ListenAndServe(":9010", nil)
 }
