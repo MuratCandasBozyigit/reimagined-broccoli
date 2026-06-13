@@ -73,9 +73,34 @@ func shortener(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"shortener":"%s"}`, kod)
 }
+func redirect(w http.ResponseWriter, r *http.Request) {
+	queryCode := r.URL.Query().Get("code")
 
+	if queryCode == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
+		return
+	}
+	bodyguard.Lock()
+	defer bodyguard.Unlock()
+
+	orijinalUrl, varMi := urlVeritabani[queryCode]
+
+	if !varMi { // yani varMi == false ise (kod bulunamadıysa)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound) // 404 Hatası
+		fmt.Fprintf(w, `{"error": "Böyle bir kod yok kanka!"}`)
+		return // Fonksiyonu burada kes, aşağıya devam etmesin
+	}
+	tiklamaSayilari[queryCode]++
+
+	http.Redirect(w, r, orijinalUrl, http.StatusMovedPermanently)
+
+}
 func main() {
 	http.HandleFunc("/api/slug", slug)
 	http.HandleFunc("/api/shorten", shortener)
+	http.HandleFunc("/api/redirect", redirect)
 	http.ListenAndServe(":9010", nil)
 }
