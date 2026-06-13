@@ -28,6 +28,7 @@ func replacer(input string) string {
 	done := replacer.Replace(inputLower)
 	return done
 }
+
 func randomCode() string {
 	havuz := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	kod := ""
@@ -39,13 +40,36 @@ func randomCode() string {
 	}
 	return kod
 }
+
+func limitKontrol(r *http.Request) bool {
+	reqIp, _, _ := net.SplitHostPort(r.RemoteAddr)
+
+	bodyguard.Lock()
+	defer bodyguard.Unlock()
+
+	istekSayaclari[reqIp]++
+
+	if istekSayaclari[reqIp] > 3 {
+		return false // Sınırı aştı, geçiş yasak!
+	}
+	return true // Sınırı aşmadı, geçebilir kanka
+}
+
 func slug(w http.ResponseWriter, r *http.Request) {
+	// 1. Önce Limit Kontrolü (Kilit açılmadan önce!)
+	if !limitKontrol(r) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprintf(w, `{"error": "Çok hızlısın kanka, yavaşla!"}`)
+		return
+	}
+
 	queryParams := r.URL.Query()
 	queryZig := queryParams.Get("input")
 
 	if queryZig == "" {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest) // 400 Hata Kodu
+		w.WriteHeader(http.StatusBadRequest)
 		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
 		return
 	}
@@ -55,7 +79,16 @@ func slug(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"slug": "%s"}`, res)
 }
+
 func shortener(w http.ResponseWriter, r *http.Request) {
+	// 1. Önce Limit Kontrolü!
+	if !limitKontrol(r) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprintf(w, `{"error": "Çok hızlısın kanka, yavaşla!"}`)
+		return
+	}
+
 	queryParams := r.URL.Query()
 	queryStr := queryParams.Get("input")
 	if queryStr == "" {
@@ -66,74 +99,66 @@ func shortener(w http.ResponseWriter, r *http.Request) {
 	}
 
 	kod := randomCode()
-	bodyguard.Lock()
-	defer bodyguard.Unlock()
 
+	bodyguard.Lock()
 	urlVeritabani[kod] = queryStr
 	tiklamaSayilari[kod] = 0
+	bodyguard.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"shortener":"%s"}`, kod)
 }
+
 func redirect(w http.ResponseWriter, r *http.Request) {
-	queryCode := r.URL.Query().Get("code")
-
-	if queryCode == "" {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
-		return
-	}
-	bodyguard.Lock()
-	defer bodyguard.Unlock()
-
-	orijinalUrl, varMi := urlVeritabani[queryCode]
-
-	if !varMi { // yani varMi == false ise (kod bulunamadıysa)
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound) // 404 Hatası
-		fmt.Fprintf(w, `{"error": "Böyle bir kod yok kanka!"}`)
-		return // Fonksiyonu burada kes, aşağıya devam etmesin
-	}
-	tiklamaSayilari[queryCode]++
-
-	http.Redirect(w, r, orijinalUrl, http.StatusMovedPermanently)
-	return
-}
-func limitor(w http.ResponseWriter, r *http.Request) {
-	reqIp, _, _ := net.SplitHostPort(r.RemoteAddr)
-
-	bodyguard.Lock()
-	defer bodyguard.Unlock()
-
-	istekSayaclari[reqIp]++
-
-	if istekSayaclari[reqIp] > 3 {
+	// 1. Önce Limit Kontrolü!
+	if !limitKontrol(r) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
 		fmt.Fprintf(w, `{"error": "Çok hızlısın kanka, yavaşla!"}`)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status": "gecit_onaylandi"}`)
+	queryCode := r.URL.Query().Get("code")
+	if queryCode == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
+		return
+	}
 
-	go func() {
-		ticker := time.NewTicker(1 * time.Second)
-		for range ticker.C {
-			bodyguard.Lock()
-			// Her saniye haritayı sıfırdan yaratıp hafızayı temizliyoruz!
-			istekSayaclari = make(map[string]int)
-			bodyguard.Unlock()
-		}
-	}()
+	bodyguard.Lock()
+	orijinalUrl, varMi := urlVeritabani[queryCode]
+	if varMi {
+		tiklamaSayilari[queryCode]++
+	}
+	bodyguard.Unlock()
+
+	if !varMi {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprintf(w, `{"error": "Böyle bir kod yok kanka!"}`)
+		return
+	}
+
+	http.Redirect(w, r, orijinalUrl, http.StatusMovedPermanently)
 }
+
 func main() {
 	http.HandleFunc("/api/slug", slug)
 	http.HandleFunc("/api/shorten", shortener)
 	http.HandleFunc("/api/redirect", redirect)
-	http.HandleFunc("/api/limitor", limitor)
+
+	// Temizlik robotunu ListenAndServe'den önceye aldık, artık hayatta!
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		for range ticker.C {
+			bodyguard.Lock()
+			istekSayaclari = make(map[string]int)
+			bodyguard.Unlock()
+		}
+	}()
+
+	fmt.Println("🚀 Komuta Merkezi Port :9010 üzerinde ayağa kalktı kanka!")
 	http.ListenAndServe(":9010", nil)
 }
