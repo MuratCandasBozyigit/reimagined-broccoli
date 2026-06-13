@@ -22,7 +22,6 @@ func main() {
 		"ö", "o",
 		"ş", "s",
 		"ü", "u",
-		" ", "-",
 	)
 	done := replacer.Replace(dash)
 	fmt.Println(done)
