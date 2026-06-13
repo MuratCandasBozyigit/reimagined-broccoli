@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func replacer(input string) {
+func replacer(input string) string {
 	input = strings.TrimSpace(input)
 	inputTL := strings.ToLower(input)
 	dash := strings.ReplaceAll(inputTL, " ", "-")
@@ -19,7 +19,7 @@ func replacer(input string) {
 		"ü", "u",
 	)
 	done := replacer.Replace(dash)
-	fmt.Println(done)
+	return done
 }
 
 func slugApi(w http.ResponseWriter, r *http.Request) {
@@ -32,12 +32,17 @@ func slugApi(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, `{"error": "input parametresi boş olamaz kanka!"}`)
 		return
 	}
+	res := replacer(gelenMetin)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Naber %s kanka!", gelenMetin)
+	fmt.Fprintf(w, `{"slug": "%s"}`, res)
+}
+func analyze() {
+
 }
 
 func main() {
 	http.HandleFunc("/api/v1/slugify", slugApi)
+	http.HandleFunc("/api/v1/analyze", analyze)
 	http.ListenAndServe(":9010", nil)
 }
