@@ -3,14 +3,17 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 )
 
 var urlVeritabani = make(map[string]string)
 var tiklamaSayilari = make(map[string]int)
 var bodyguard sync.Mutex
+var istekSayaclari = make(map[string]int)
 
 func replacer(input string) string {
 	inputTrim := strings.TrimSpace(input)
@@ -96,11 +99,41 @@ func redirect(w http.ResponseWriter, r *http.Request) {
 	tiklamaSayilari[queryCode]++
 
 	http.Redirect(w, r, orijinalUrl, http.StatusMovedPermanently)
+	return
+}
+func limitor(w http.ResponseWriter, r *http.Request) {
+	reqIp, _, _ := net.SplitHostPort(r.RemoteAddr)
 
+	bodyguard.Lock()
+	defer bodyguard.Unlock()
+
+	istekSayaclari[reqIp]++
+
+	if istekSayaclari[reqIp] > 3 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		fmt.Fprintf(w, `{"error": "Çok hızlısın kanka, yavaşla!"}`)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, `{"status": "gecit_onaylandi"}`)
+
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		for range ticker.C {
+			bodyguard.Lock()
+			// Her saniye haritayı sıfırdan yaratıp hafızayı temizliyoruz!
+			istekSayaclari = make(map[string]int)
+			bodyguard.Unlock()
+		}
+	}()
 }
 func main() {
 	http.HandleFunc("/api/slug", slug)
 	http.HandleFunc("/api/shorten", shortener)
 	http.HandleFunc("/api/redirect", redirect)
+	http.HandleFunc("/api/limitor", limitor)
 	http.ListenAndServe(":9010", nil)
 }
