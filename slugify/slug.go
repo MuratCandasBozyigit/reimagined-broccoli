@@ -1,10 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 )
+
+type AnalizSonucu struct {
+	TotalChars int `json:"total_chars"`
+	WordCount  int `json:"word_count"`
+}
 
 func replacer(input string) string {
 	input = strings.TrimSpace(input)
@@ -37,12 +43,26 @@ func slugApi(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, `{"slug": "%s"}`, res)
 }
-func analyze() {
+func analyze(w http.ResponseWriter, r *http.Request) {
+	queryParams := r.URL.Query()
+	queryStr := queryParams.Get("input")
+	splittedStr := strings.Split(queryStr, "")
+	uz := len(splittedStr)
+	kelimeler := strings.Split(queryStr, " ")
+	kelimeSayisi := len(kelimeler)
+	rapor := AnalizSonucu{
+		TotalChars: uz,
+		WordCount:  kelimeSayisi,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(rapor)
 
 }
 
 func main() {
 	http.HandleFunc("/api/v1/slugify", slugApi)
 	http.HandleFunc("/api/v1/analyze", analyze)
+
 	http.ListenAndServe(":9010", nil)
 }
